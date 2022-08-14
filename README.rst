@@ -8,4 +8,4 @@
 	:target: https://coveralls.io/github/jmcrawford45/rfc_sandbox?branch=main
 
 
-Reads and grades collectible trading cards
+Sandbox repo for me to learn through implementing RFCs of interest
