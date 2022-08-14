@@ -1,0 +1,7 @@
+tox
+black
+isort
+coveralls
+pre-commit
+requests
+-e .
