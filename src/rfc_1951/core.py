@@ -1,5 +1,5 @@
 NON_COMPRESSABLE_MAX_SIZE = 65535
-LZ77_MAX_LOOKBACK = 32 * (2 ** 10)
+LZ77_MAX_LOOKBACK = 32 * (2**10)
 MAX_DUPLICATED_LENGTH = 258
 CODE_END_OF_BLOCK = 256
 GZIP_FILE_ID = bytes.fromhex("1f8b")
@@ -60,22 +60,22 @@ class Length:
         self.code = code
         if code in range(257, 265):
             self.extra_bits = 0
-            self.min_length = 3 + (code - 257) * (2 ** self.extra_bits)
+            self.min_length = 3 + (code - 257) * (2**self.extra_bits)
         elif code in range(265, 269):
             self.extra_bits = 1
-            self.min_length = 11 + (code - 265) * (2 ** self.extra_bits)
+            self.min_length = 11 + (code - 265) * (2**self.extra_bits)
         elif code in range(269, 273):
             self.extra_bits = 2
-            self.min_length = 19 + (code - 269) * (2 ** self.extra_bits)
+            self.min_length = 19 + (code - 269) * (2**self.extra_bits)
         elif code in range(273, 277):
             self.extra_bits = 3
-            self.min_length = 35 + (code - 273) * (2 ** self.extra_bits)
+            self.min_length = 35 + (code - 273) * (2**self.extra_bits)
         elif code in range(277, 281):
             self.extra_bits = 4
-            self.min_length = 67 + (code - 277) * (2 ** self.extra_bits)
+            self.min_length = 67 + (code - 277) * (2**self.extra_bits)
         elif code in range(281, 285):
             self.extra_bits = 5
-            self.min_length = 131 + (code - 281) * (2 ** self.extra_bits)
+            self.min_length = 131 + (code - 281) * (2**self.extra_bits)
         else:
             self.extra_bits = 0
             self.min_length = 258
