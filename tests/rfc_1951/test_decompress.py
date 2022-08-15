@@ -1,4 +1,3 @@
-from io import BytesIO
 import sys
 
 import pytest
@@ -11,50 +10,34 @@ from datetime import datetime
 
 VALID_FILE_HEADER = "1f8b08083ed0675b000348656c6c6f2e7363616c6100cb4f"
 
-
 @pytest.mark.parametrize(
-    "input_stream,offset,expected",
+    "input_stream,expected",
     [
         (
-            0b00001000 .to_bytes(1, "big"),
-            4,
+            BitStream(BytesIO(0b00000001 .to_bytes(1, "big"))),
             BlockHeader(True, BlockType.NO_COMPRESSION),
         ),
         (
-            0b10000000 .to_bytes(1, "big"),
-            0,
-            BlockHeader(True, BlockType.NO_COMPRESSION),
-        ),
-        (
-            0b01000000 .to_bytes(1, "big"),
-            0,
+            BitStream(BytesIO(0b00000100.to_bytes(1, "big"))),
             BlockHeader(False, BlockType.DYNAMIC_HUFFMAN_COMPRESSION),
         ),
         (
-            0b00000001 .to_bytes(1, "big") + 0b01000000 .to_bytes(1, "big"),
-            7,
+            BitStream(BytesIO(0b00000011.to_bytes(1, "big"))),
             BlockHeader(True, BlockType.FIXED_HUFFMAN_COMPRESSION),
         ),
         (
-            0b00000001 .to_bytes(1, "big") + 0b10000000 .to_bytes(1, "big"),
-            6,
+            BitStream(BytesIO(0b00000110.to_bytes(1, "big"))),
             BlockHeader(False, BlockType.RESERVED_ERROR),
         ),
     ],
 )
-def test_get_block_header(input_stream, offset, expected):
-    assert get_block_header(BytesIO(input_stream), offset) == expected
-
-
-@pytest.mark.parametrize("offset", [-1, 8, 10])
-def test_get_block_header_invalid(offset):
-    with pytest.raises(ValueError):
-        get_block_header(BytesIO(0b00001000 .to_bytes(1, "big")), offset)
+def test_get_block_header(input_stream, expected):
+    assert get_block_header(input_stream) == expected
 
 
 def test_get_file_header_valid():
-    hello_dot_scala = bytes.fromhex(VALID_FILE_HEADER)
-    header = get_file_header(BytesIO(hello_dot_scala))
+    hello_dot_scala = BytesIO(bytes.fromhex(VALID_FILE_HEADER))
+    header = get_file_header(BitStream(hello_dot_scala))
     assert header == FileHeader(
         os=OS.UNIX,
         mtime=datetime(2018, 8, 5, 23, 36, 14),
@@ -65,7 +48,7 @@ def test_get_file_header_valid():
 def test_get_file_header_invalid_id():
     invalid_header = b"\x00" + bytes.fromhex(VALID_FILE_HEADER[2:])
     with pytest.raises(IOError, match="not a gzip file"):
-        get_file_header(BytesIO(invalid_header))
+        get_file_header(BitStream(invalid_header))
 
 
 def test_get_file_header_invalid_cm():
@@ -75,7 +58,7 @@ def test_get_file_header_invalid_cm():
         + bytes.fromhex(VALID_FILE_HEADER[6:])
     )
     with pytest.raises(IOError, match="unsupported compression method"):
-        get_file_header(BytesIO(invalid_header))
+        get_file_header(BitStream(invalid_header))
 
 
 def test_get_file_header_invalid_flags():
@@ -85,4 +68,4 @@ def test_get_file_header_invalid_flags():
         + bytes.fromhex(VALID_FILE_HEADER[8:])
     )
     with pytest.raises(IOError, match="unknown gzip flag"):
-        get_file_header(BytesIO(invalid_header))
+        get_file_header(BitStream(invalid_header))

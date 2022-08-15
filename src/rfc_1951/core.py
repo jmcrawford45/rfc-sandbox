@@ -4,12 +4,62 @@ MAX_DUPLICATED_LENGTH = 258
 CODE_END_OF_BLOCK = 256
 GZIP_FILE_ID = bytes.fromhex("1f8b")
 COMPRESSION_METHOD = b"\x08"
+CODE_CODE_ORDER = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15]
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
 from enum import Enum
+from io import BufferedIOBase, BytesIO
 from math import ceil
 from datetime import datetime
+from typing import Union
+
+
+class BitStream:
+    """
+    A thin wrapper around a byte stream that allows reading bits instead of bytes.
+    """
+    def __init__(self, underlying: Union[bytes, BufferedIOBase]):
+        if isinstance(underlying, bytes):
+            underlying = BytesIO(underlying)
+        self.underlying = underlying
+        self.num_bits = 0
+        self.buffer = 0b00000000
+
+    def _get_buffered_bits(self, n: int) -> int:
+        """Return extracted bits as an int."""
+        mask = 2 ** n - 1
+        out = self.buffer & mask
+        self.buffer = self.buffer >> (n)
+        self.num_bits -= n
+        return out
+
+    def _buffer_byte(self):
+        self.buffer += int.from_bytes(self.underlying.read(1), 'big') << self.num_bits
+        self.num_bits += 8
+
+
+    def clear_buffer(self):
+        """Useful for ignoring partial bytes"""
+        self.num_bits = 0
+        self.buffer = 0b00000000
+
+    def read(self, n: int) -> Union[bytes, int]:
+        if not self.num_bits and n % 8 == 0:
+            out = b""
+            to_read = n // 8
+            while to_read:
+                out += self.underlying.read(1)
+                to_read -= 1
+            return out
+        if (n + self.num_bits) not in range(33):
+            raise ValueError("Cannot buffer more than 32 bits")
+        to_get = n
+        while self.num_bits < n:
+            self._buffer_byte()
+        return self._get_buffered_bits(n)
+
+
 
 
 class BlockType(Enum):
