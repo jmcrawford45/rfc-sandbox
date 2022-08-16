@@ -30,7 +30,7 @@ class BitStream:
         """Return extracted bits as an int."""
         mask = 2 ** n - 1
         out = self.buffer & mask
-        self.buffer = self.buffer >> (n)
+        self.buffer = self.buffer >> n
         self.num_bits -= n
         return out
 
@@ -161,6 +161,7 @@ class HuffmanEncoding:
 
     def __init__(self, encoding: list[int]):
         self.encoding = encoding
+        self.decode_map = dict([(v, k) for k,v in enumerate(self.encoding)])
 
     @classmethod
     def from_alphabet_code_lengths(cls, alphabet_code_lengths: list[int]):

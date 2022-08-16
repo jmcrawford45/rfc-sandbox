@@ -1,6 +1,6 @@
 from rfc_1951.core import *
 
-from io import BytesIO
+from io import BytesIO, BufferedWriter
 from struct import unpack
 from binascii import crc32
 from datetime import datetime
@@ -19,19 +19,20 @@ def ones_complement(x: int, y: int) -> bool:
     return base != 0 and ((base + 1) & base) == 0
 
 
-def decode(stream: BitStream, output: BytesIO):
-    block_header = BlockerHeader(False, BlockType.NO_COMPRESSION)
+def decode(stream: BitStream) -> bytes:
+    output = b""
     while True:
-        block_header = get_block_header(stream, offset=0)
+        block_header = get_block_header(stream)
+        stream.clear_buffer()
         if block_header.block_type == BlockType.NO_COMPRESSION:
             block_len, ones_complement = unpack("<HH", stream.read(16))
             if not ones_complement(block_len, ones_complement):
                 raise ValueError(
                     f"Invalid LEN, NLEN pair: {ones_complement} is not the ones-complement of {block_len}"
                 )
-            output.write(stream.read(block_len * 8))
+            output += stream.read(block_len * 8)
         elif (
-            block_header.block_type == BlockType.DYNAMIC_HUFFMAN_COMPRESSION
+            block_header.block_type == BlockType.FIXED_HUFFMAN_COMPRESSION
             or block_header.block_type == BlockType.DYNAMIC_HUFFMAN_COMPRESSION
         ):
             if (
@@ -39,13 +40,28 @@ def decode(stream: BitStream, output: BytesIO):
                 == BlockType.DYNAMIC_HUFFMAN_COMPRESSION
             ):
                 # read code trees
-                pass
+                n_len = stream.read(5) + 257
+                n_dist = stream.read(5) + 1
+                n_code = stream.read(4) + 4
+                lengths = [0] * len(CODE_CODE_ORDER)
+                code_codes_added = 0
+                while len(lengths) < n_code:
+                    lengths[CODE_CODE_ORDER[code_codes_added]] = stream.read(3)
+                    code_codes_added += 1
+                code_huffman = HuffmanEncoding.from_alphabet_code_lengths(lengths)
+                codes_added = 0
+                code_code_lengths = []
+                while codes_added < n_len + n_dist:
+                    code_code_lengths.append(stream.read())
+                    codes_added += 1
             else:
-                huffman = HuffmanEncoding([8] * 144 + [9] * 112 + [7] * 24 + [8] * 8)
+                len_codes = HuffmanEncoding.from_alphabet_code_lengths([8] * 144 + [9] * 112 + [7] * 24 + [8] * 8)
+                dist_codes = HuffmanEncoding.from_alphabet_code_lengths([5] * 32)
             while True:
-                value = ...
+                lit_value = stream.read(7)
+                value = len_codes.decode_map[lit_value]
                 if value < 256:
-                    output.write(value)
+                    output += chr(value).encode()
                 elif value == CODE_END_OF_BLOCK:
                     break
                 else:
@@ -59,7 +75,7 @@ def decode(stream: BitStream, output: BytesIO):
                 f"Encountered invalid block {block_header.block_type}"
             )
         if block_header.is_final:
-            break
+            return output
 
 
 def get_null_terminated_string(stream: BitStream):
@@ -80,13 +96,13 @@ def get_file_header(stream: BitStream):
         raise IOError("gzip file uses unsupported compression method")
     raw_flags = stream.read(8)
     flags = unpack("B", raw_flags)[0]
-    if flags >= 0b100000:
-        raise IOError("unknown gzip flag set")
     # We ignore FTEXT flag since there aren't different file formats for ascii and binary for my system
     is_crc = bool(flags & 0b10)
     is_extra = bool(flags & 0b100)
     is_name = bool(flags & 0b1000)
     is_comment = bool(flags & 0b10000)
+    if flags >= 0b100000:
+        raise IOError("unknown gzip flag set")
     mtime_raw = stream.read(32)
     mtime = datetime.fromtimestamp(unpack("<i", mtime_raw)[0])
     # we ignore xfl since it's useful for diagnostics only
@@ -115,14 +131,16 @@ def get_file_header(stream: BitStream):
     return FileHeader(os, mtime, extra_data, filename, comment, crc)
 
 
-def unzip(stream: BitStream):
+def unzip(stream: BitStream) -> bytes:
     """
     :param stream: a stream of a gzip file
     """
     get_file_header(stream)
-    output = BytesIO()
-    decode(stream, output)
-    if crc32(output.read()) != unpack("<H", stream.read(16)):
+    output = decode(stream)
+    stream.clear_buffer()
+    crc = unpack("<I", stream.read(32))[0]
+    if crc and crc != crc32(output):
         raise IOError("CRC of uncompressed did not match for gzip file")
-    if unpack("<H", stream.read(16)) != len(output):
+    original_size = unpack("<I", stream.read(32))[0]
+    if original_size != len(output) % (2 ** 32):
         raise IOError("uncompressed data size did not match for gzip file")

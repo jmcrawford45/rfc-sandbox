@@ -7,8 +7,11 @@ from rfc_1951.decompress import *
 
 from struct import pack
 from datetime import datetime
+from io import BytesIO, BufferedReader
 
 VALID_FILE_HEADER = "1f8b08083ed0675b000348656c6c6f2e7363616c6100cb4f"
+VALID_FILE = "1f8b08083ed0675b000348656c6c6f2e7363616c6100cb4fca4a4d2e51f048cdc9c95748ad2849cd4b2956702c2850a8e6522828cacc2bc9c9d3482c4a2fd62b4a2d4b2d2a4ed5cbcd0e2e018aa76b282928696a72d5020021b8fcbe41000000"
+VALID_FILE_UNCOMPRESSED = "1f8b080025fcfb62000303000000000000000000"
 
 @pytest.mark.parametrize(
     "input_stream,expected",
@@ -69,3 +72,7 @@ def test_get_file_header_invalid_flags():
     )
     with pytest.raises(IOError, match="unknown gzip flag"):
         get_file_header(BitStream(invalid_header))
+
+def test_unzip():
+	unzip(BitStream(BufferedReader(BytesIO(bytes.fromhex(VALID_FILE_UNCOMPRESSED)))))
+
