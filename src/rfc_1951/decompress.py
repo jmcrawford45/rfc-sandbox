@@ -14,19 +14,34 @@ def get_block_header(stream: BitStream) -> BlockHeader:
     return BlockHeader(is_final, block_type)
 
 
-def ones_complement(x: int, y: int) -> bool:
+def is_ones_complement(x: int, y: int) -> bool:
     base = x ^ y
     return base != 0 and ((base + 1) & base) == 0
+
+
+def get_code_codes(n: int, code_huffman: HuffmanEncoding, stream: BitStream) -> list[int]:
+    """Extract n codes encoded by the huffman."""
+    code_codes = []
+    while len(code_codes) < n:
+        code_code = stream.read_huffman_bits(code_huffman)
+        if code_code in range(0, 16):
+            code_codes.append(code_code)
+        else:
+            to_repeat = code_codes[-1] if code_code == 16 else 0
+            code_code = CodeCode(code_code)
+            to_add = (code_code.min_length + stream.read(code_code.extra_bits, prefer_bytes = False))
+            code_codes += [to_repeat] * to_add
+    return code_codes
 
 
 def decode(stream: BitStream) -> bytes:
     output = b""
     while True:
         block_header = get_block_header(stream)
-        stream.clear_buffer()
         if block_header.block_type == BlockType.NO_COMPRESSION:
-            block_len, ones_complement = unpack("<HH", stream.read(16))
-            if not ones_complement(block_len, ones_complement):
+            stream.clear_buffer()
+            block_len, ones_complement = unpack("<HH", stream.read(32))
+            if not is_ones_complement(block_len, ones_complement & 0xffff):
                 raise ValueError(
                     f"Invalid LEN, NLEN pair: {ones_complement} is not the ones-complement of {block_len}"
                 )
@@ -45,21 +60,21 @@ def decode(stream: BitStream) -> bytes:
                 n_code = stream.read(4) + 4
                 lengths = [0] * len(CODE_CODE_ORDER)
                 code_codes_added = 0
-                while len(lengths) < n_code:
+                while code_codes_added < n_code:
                     lengths[CODE_CODE_ORDER[code_codes_added]] = stream.read(3)
                     code_codes_added += 1
                 code_huffman = HuffmanEncoding.from_alphabet_code_lengths(lengths)
-                codes_added = 0
-                code_code_lengths = []
-                while codes_added < n_len + n_dist:
-                    code_code_lengths.append(stream.read())
-                    codes_added += 1
+
+                code_codes = get_code_codes(n_len + n_dist, code_huffman, stream)
+                code_code_lengths = code_codes[:n_len]
+                code_code_dists = code_codes[n_len:]
+                len_codes = HuffmanEncoding.from_alphabet_code_lengths(code_code_lengths)
+                dist_codes = HuffmanEncoding.from_alphabet_code_lengths(code_code_dists)
             else:
-                len_codes = HuffmanEncoding.from_alphabet_code_lengths([8] * 144 + [9] * 112 + [7] * 24 + [8] * 8)
-                dist_codes = HuffmanEncoding.from_alphabet_code_lengths([5] * 32)
+                len_codes = STATIC_LEN_CODES
+                dist_codes = STATIC_DIST_CODES
             while True:
-                lit_value = stream.read(7)
-                value = len_codes.decode_map[lit_value]
+                value = stream.read_huffman_bits(len_codes)
                 if value < 256:
                     output += chr(value).encode()
                 elif value == CODE_END_OF_BLOCK:
@@ -68,7 +83,16 @@ def decode(stream: BitStream) -> bytes:
                     # decode distance from input stream
                     # move backwards in output stream
                     # copy length bytes from this position to output stream
-                    pass
+                    length = Length(value)
+                    length = length.min_length + stream.read(length.extra_bits, prefer_bytes = False)
+                    dist = stream.read_huffman_bits(dist_codes)
+                    dist = Distance(dist)
+                    dist = dist.min_distance + stream.read(dist.extra_bits, prefer_bytes = False)
+                    index = len(output) - dist
+                    while length:
+                        output += output[index:index+1]
+                        length -= 1
+                        index += 1
 
         else:
             raise ValueError(
@@ -144,3 +168,4 @@ def unzip(stream: BitStream) -> bytes:
     original_size = unpack("<I", stream.read(32))[0]
     if original_size != len(output) % (2 ** 32):
         raise IOError("uncompressed data size did not match for gzip file")
+    return output

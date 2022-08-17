@@ -5,12 +5,7 @@ import pytest
 
 def test_deflate_huffman_encoding_from_code_lengths():
     huffman = HuffmanEncoding.from_alphabet_code_lengths([2, 1, 3, 3])
-    assert huffman.encoding == [0b10, 0b0, 0b110, 0b111]
-
-
-def test_deflate_huffman_encoding_from_code_lengths_invalid():
-    with pytest.raises(ValueError):
-        HuffmanEncoding.from_alphabet_code_lengths([2, 1, 0, 3])
+    assert huffman.encoding == ['10', '0', '110', '111']
 
 
 @pytest.mark.parametrize(

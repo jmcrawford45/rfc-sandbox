@@ -13,6 +13,7 @@ from io import BufferedIOBase, BytesIO
 from math import ceil
 from datetime import datetime
 from typing import Union
+from struct import pack
 
 
 class BitStream:
@@ -44,8 +45,17 @@ class BitStream:
         self.num_bits = 0
         self.buffer = 0b00000000
 
-    def read(self, n: int) -> Union[bytes, int]:
-        if not self.num_bits and n % 8 == 0:
+    def read_huffman_bits(self, huffman: 'HuffmanEncoding') -> int:
+        """Return a value decoded from a Huffman tree, or throw a KeyError if not possible"""
+        node = huffman.node
+        while node and node.value is None:
+            node = node.children.get(self.read(1))
+        if not node:
+            raise KeyError("stream does not have a valid code")
+        return node.value
+
+    def read(self, n: int, prefer_bytes: bool = True) -> Union[bytes, int]:
+        if prefer_bytes and not self.num_bits and n % 8 == 0:
             out = b""
             to_read = n // 8
             while to_read:
@@ -58,6 +68,39 @@ class BitStream:
         while self.num_bits < n:
             self._buffer_byte()
         return self._get_buffered_bits(n)
+
+    def write(self, n: int, content: bytes | int, prefer_bytes: bool = True):
+        if isinstance(content, bytes) and n % 8:
+            raise ValueError("Cannot write partial byte")
+        if prefer_bytes and not self.num_bits and n % 8 == 0:
+            for i in range(len(content)):
+                self.underlying = BytesIO(self.underlying.getvalue() + content[i:i+1])
+        else:
+            while n:
+                if isinstance(content, bytes):
+                    to_add = int.from_bytes(content[0:1], 'big')
+                    content = content[1:]
+                    num_bits_added = 8
+                else:
+                    to_add = content & (2 ** (n % 8) - 1)
+                    content = content >> (n % 8)
+                    num_bits_added = n % 8
+                self.buffer += to_add << self.num_bits
+                self.num_bits += num_bits_added
+                n -= num_bits_added
+                while self.num_bits >= 8:
+                    self.flush_byte()
+
+    def flush_byte(self):
+        self.underlying = BytesIO(self.underlying.getvalue() + pack("B", self.buffer & 0xff))
+        self.num_bits = max(0, self.num_bits - 8)
+        self.buffer = self.buffer >> 8
+
+    def flush(self):
+        while self.buffer:
+            self.flush_byte()
+
+
 
 
 
@@ -101,6 +144,31 @@ class FileHeader:
     filename: str | None = None
     comment: str | None = None
     crc: int | None = None
+
+    def to_bytes(self) -> bytes:
+        flags = 0b00000000
+
+        if self.extra_data:
+            flags |= 0b100
+        if self.filename:
+            flags |=  0b1000
+        if self.comment:
+            flags |= 0b10000
+        # if self.crc:
+        #     flags |= 0b10
+        flags = pack("B", flags)
+        xfl = b"\x00"    
+
+        header = GZIP_FILE_ID + COMPRESSION_METHOD + flags + pack("<i", int(self.mtime.timestamp())) + xfl + pack("B", self.os.value)
+        if self.extra_data:
+            header += pack("<H", len(extra_data)) + extra_data
+        if self.filename:
+            header += self.filename.encode("latin-1") + b"\x00"
+        if self.comment:
+            header += self.comment.encode("latin-1") + b"\x00"
+        # if self.crc:
+        #     header += pack("<H", self.crc)
+        return header
 
 
 class Length:
@@ -146,8 +214,38 @@ class Distance:
                 + (2 ** (self.extra_bits) if code % 2 else 0)
             )
 
+class CodeCode:
+    EXTRA_BITS = {
+        16: 2,
+        17: 3,
+        18: 7
+    }
+    MIN_LENGTH = {
+        16: 3,
+        17: 3,
+        18: 11
+    }
+    def __init__(self, code: int):
+        if not (16 <= code <= 18):
+            raise ValueError("CodeCode must have code where 0 <= code <= 29")
+        self.code = code
+        self.extra_bits = self.EXTRA_BITS[code]
+        self.min_length = self.MIN_LENGTH[code]
+
+class Node:
+    def __init__(self):
+        self.children = defaultdict(Node)
+        self.value = None
+
+    def traverse(self, binary):
+        node = self
+        for char in binary:
+            node = node.children.get(int(char))
+        return node
+
 
 class HuffmanEncoding:
+
     """
     The Huffman codes used for each alphabet in the "deflate"
     format have two additional rules:
@@ -159,9 +257,10 @@ class HuffmanEncoding:
      * Shorter codes lexicographically precede longer codes.
     """
 
-    def __init__(self, encoding: list[int]):
+    def __init__(self, encoding: list[int], alphabet_code_lengths: list[int]):
         self.encoding = encoding
         self.decode_map = dict([(v, k) for k,v in enumerate(self.encoding)])
+        self.alphabet_code_lengths = alphabet_code_lengths
 
     @classmethod
     def from_alphabet_code_lengths(cls, alphabet_code_lengths: list[int]):
@@ -180,14 +279,16 @@ class HuffmanEncoding:
            D       111
 
         """
-        if not all(alphabet_code_lengths):
-            raise ValueError("Invalid Huffman code with bit length of 0")
+        # if not all(alphabet_code_lengths):
+        #     raise ValueError("Invalid Huffman code with bit length of 0")
         # Count the number of codes for each code length.  Let
         # bl_count[N] be the number of codes of length N, N >= 1.
         counts_by_length = defaultdict(int, Counter(alphabet_code_lengths))
         # Find the numerical value of the smallest code for each code length
         next_code = dict()
         code = 0
+        if 0 in counts_by_length:
+            del counts_by_length[0]
         for bits in range(1, max(counts_by_length) + 1):
             code = (code + counts_by_length[bits - 1]) << 1
             next_code[bits] = code
@@ -196,9 +297,25 @@ class HuffmanEncoding:
         # values determined at step 2. Codes that are never used
         # (which have a bit length of zero) must not be assigned a
         # value.
+        root = node = Node()
         alphabet_encode_map = [0] * len(alphabet_code_lengths)
         for letter_num in range(len(alphabet_code_lengths)):
             code_length = alphabet_code_lengths[letter_num]
+            if code_length == 0:
+                continue
             alphabet_encode_map[letter_num] = next_code[code_length]
+            binary = format(alphabet_encode_map[letter_num], f"0{code_length}b")
+            node = root
+            for char in binary:
+                node = node.children[int(char)]
+            node.value = letter_num
+            alphabet_encode_map[letter_num] = binary
             next_code[code_length] += 1
-        return cls(alphabet_encode_map)
+        base = cls(alphabet_encode_map, alphabet_code_lengths)
+        base.node = root
+        return base
+
+STATIC_LEN_CODES = HuffmanEncoding.from_alphabet_code_lengths([8] * 144 + [9] * 112 + [7] * 24 + [8] * 8)
+STATIC_DIST_CODES = HuffmanEncoding.from_alphabet_code_lengths([5] * 32)
+
+

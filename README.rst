@@ -11,7 +11,9 @@
 Sandbox repo for me to learn through implementing RFCs of interest
 
 Future work:
-section 3.2.6 fixed Huffman codes
-Don't assume reads always get the correct amount
-refactor header crc
 maintain protection, ownership, and (optional) mtime attributes for unzipped file
+use streams instead of str for decompress out and compress in
+don't re-init ByteIO in BitStream.write
+dynamic huffman
+use more than 1 block
+encoding lookback > 1
