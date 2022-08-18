@@ -82,9 +82,9 @@ class BitStream:
                     content = content[1:]
                     num_bits_added = 8
                 else:
-                    to_add = content & (2 ** (n % 8) - 1)
-                    content = content >> (n % 8)
-                    num_bits_added = n % 8
+                    num_bits_added = n % 8 if n != 8 else 8
+                    to_add = content & (2 ** (num_bits_added) - 1)
+                    content = content >> (num_bits_added)
                 self.buffer += to_add << self.num_bits
                 self.num_bits += num_bits_added
                 n -= num_bits_added
@@ -92,7 +92,8 @@ class BitStream:
                     self.flush_byte()
 
     def flush_byte(self):
-        self.underlying = BytesIO(self.underlying.getvalue() + pack("B", self.buffer & 0xff))
+        if self.buffer:
+            self.underlying = BytesIO(self.underlying.getvalue() + pack("B", self.buffer & 0xff))
         self.num_bits = max(0, self.num_bits - 8)
         self.buffer = self.buffer >> 8
 
