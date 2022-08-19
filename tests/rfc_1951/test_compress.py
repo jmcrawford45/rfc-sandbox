@@ -27,7 +27,9 @@ def test_zip_literal_fixed_compression_long_match():
 
 
 def test_length_distance():
-    assert get_length_distance("aba", "abaaba", 3) == (3, 3)
+    assert get_length_distance("abaaba", 3, {"aba": [0]}) == (3, 3)
+    assert get_length_distance("abaabac", 3, {"aba": [0]}) == (3, 3)
+    assert get_length_distance("abaabaa", 3, {"aba": [0]}) == (4, 3)
 
 
 def test_zip_unzip_file():

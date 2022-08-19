@@ -11,9 +11,12 @@
 Sandbox repo for me to learn through implementing RFCs of interest
 
 Future work:
-cli wrapper that operates on files
-use streams instead of str for decompress out and compress in
-don't re-init ByteIO in BitStream.write
-dynamic huffman
-use more than 1 block
-efficient compress.get_length_distance using hash chain map
+ux
+	cli wrapper that operates on files
+	use streams instead of str for decompress out and compress in
+perf
+	don't re-init ByteIO in BitStream.write
+	dynamic huffman
+	use more than 1 block
+rtb
+	clean mypy run

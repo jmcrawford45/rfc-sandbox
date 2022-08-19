@@ -17,43 +17,41 @@ def encode_no_compression(content_in: bytes, output: BitStream):
 
 
 def get_length_distance(
-    window: bytes, content_in: bytes, index: int
+    content_in: bytes, index: int, hash_chain_map: dict[bytes, list[int]]
 ) -> tuple[int, int]:
     """Return a length, distance pair representing the most recent match.
-    :example: get_length_distance("aba", "abaaba", 3) -> (3, 3)
+    :example: get_length_distance("abaaba", 3, {"aba": [0]}) -> (3, 3)
     """
-    length = distance = 0
-    actual_window = window + content_in[index : index + MAX_LOOKAHEAD]
-    lookback = 1
-    while True:
-        window_index = len(window) - lookback
-        if window_index < 0:
-            break
-        length_match = 0
-        while (
-            length_match < Length.MAX_LENGTH
-            and index + length_match < len(content_in)
-            and window_index + length_match < len(actual_window)
-            and content_in[index + length_match]
-            == actual_window[window_index + length_match]
-        ):
-            length_match += 1
-            if length_match > length:
-                length = length_match
-                distance = lookback
-        lookback += 1
-    if length < Length.MIN_LENGTH:
+    if index + Length.MIN_LENGTH > len(content_in):
+        # not worth run encoding
         return 0, 0
+    if content_in[index:index+Length.MIN_LENGTH] not in hash_chain_map:
+        # no matches
+        return 0, 0
+    length_match = Length.MIN_LENGTH
+    hash_matches = hash_chain_map[content_in[index:index+Length.MIN_LENGTH]]
+    for match in reversed(hash_matches):  # prefer recent matches
+        if index - match > MAX_LOOKBACK:
+            # outside of window
+            return 0, 0
+        distance = index - match
+        length = Length.MIN_LENGTH
+        while index+length < len(content_in) and content_in[index+length] == content_in[match+length]:
+            if length > length_match:
+                length_match = length
+                if length_match == Length.MAX_LENGTH:
+                    return length_match, distance
+            length += 1
     return length, distance
 
 
 def encode_fixed_compression(content_in: bytes, output: BitStream):
-    window = b""
     index = 0
+    hash_chain_map = defaultdict(list)
     while index < len(content_in):
-        if len(window) > MAX_LOOKBACK:
-            window = window[len(window) - MAX_LOOKBACK :]
-        length, distance = get_length_distance(window, content_in, index)
+        if index-1 >= 0 and index+Length.MIN_LENGTH-1 < len(content_in):
+            hash_chain_map[content_in[index-1:index+Length.MIN_LENGTH-1]].append(index-1)
+        length, distance = get_length_distance(content_in, index, hash_chain_map)
         if not length and not distance:
             output.write_code(
                 len(STATIC_LEN_CODES.encoding[content_in[index]]),
@@ -64,7 +62,6 @@ def encode_fixed_compression(content_in: bytes, output: BitStream):
                     2,
                 ),
             )
-            window += content_in[index : index + 1]
             index += 1
         else:
             length_encoded = Length.from_length(length)
@@ -101,7 +98,6 @@ def encode_fixed_compression(content_in: bytes, output: BitStream):
                     distance_encoded.extra_bits,
                     distance_encoded.additional_content,
                 )
-            window += content_in[index : index + length]
             index += length
 
     output.write(
