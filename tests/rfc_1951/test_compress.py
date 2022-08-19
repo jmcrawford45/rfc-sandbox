@@ -1,8 +1,10 @@
+from io import BufferedReader, BytesIO
+
+import pkg_resources
+
+from rfc_1951.compress import *
 from rfc_1951.core import *
 from rfc_1951.decompress import *
-from rfc_1951.compress import *
-from io import BytesIO, BufferedReader
-import pkg_resources
 
 
 def test_zip_no_compression():

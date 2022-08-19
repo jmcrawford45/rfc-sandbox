@@ -1,8 +1,8 @@
-from rfc_1951.core import *
-from datetime import datetime
-
 from binascii import crc32
+from datetime import datetime
 from struct import pack
+
+from rfc_1951.core import *
 
 MAX_LOOKBACK = 2 ** 10
 MAX_LOOKAHEAD = 200

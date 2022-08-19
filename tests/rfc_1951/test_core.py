@@ -1,6 +1,6 @@
-from rfc_1951.core import Distance, Length, HuffmanEncoding
-
 import pytest
+
+from rfc_1951.core import Distance, HuffmanEncoding, Length
 
 
 def test_deflate_huffman_encoding_from_code_lengths():

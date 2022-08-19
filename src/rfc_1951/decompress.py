@@ -1,9 +1,9 @@
-from rfc_1951.core import *
-
-from io import BytesIO, BufferedWriter
-from struct import unpack
 from binascii import crc32
 from datetime import datetime
+from io import BufferedWriter, BytesIO
+from struct import unpack
+
+from rfc_1951.core import *
 
 MAX_BIT_OFFSET = 7
 

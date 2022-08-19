@@ -28,12 +28,12 @@ CODE_CODE_ORDER = [
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
+from datetime import datetime
 from enum import Enum
 from io import BufferedIOBase, BytesIO
 from math import ceil, floor, log2
-from datetime import datetime
-from typing import Union
 from struct import pack
+from typing import Union
 
 
 class BitStream:
