@@ -80,14 +80,14 @@ def test_unzip_empty():
     stream = BitStream(
         BufferedReader(BytesIO(bytes.fromhex(VALID_FILE_DEVNULL)))
     )
-    assert unzip(stream) == b""
+    assert gunzip(stream) == b""
 
 
 def test_unzip():
     stream = BitStream(
         BufferedReader(BytesIO(bytes.fromhex(VALID_FILE_NEWLINE)))
     )
-    assert unzip(stream) == b"\n"
+    assert gunzip(stream) == b"\n"
 
 
 def test_unzip_file():
@@ -100,4 +100,4 @@ def test_unzip_file():
         pkg_resources.resource_filename(__name__, f"data/{name}.gz"), "rb"
     ) as out:
         in_file = out.read()
-    assert unzip(BitStream(in_file)) == expected
+    assert gunzip(BitStream(in_file)) == expected

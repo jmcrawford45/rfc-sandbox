@@ -171,7 +171,7 @@ def get_file_header(stream: BitStream):
     return FileHeader(os, mtime, extra_data, filename, comment, crc)
 
 
-def unzip(stream: BitStream) -> bytes:
+def gunzip(stream: BitStream) -> bytes:
     """
     :param stream: a stream of a gzip file
     """

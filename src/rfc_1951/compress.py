@@ -134,7 +134,7 @@ def encode(stream: BufferedIOBase, block_type: BlockType) -> bytes:
     return output.underlying.getvalue()
 
 
-def zip(
+def gzip(
     stream: BufferedIOBase,
     block_type: BlockType = BlockType.FIXED_HUFFMAN_COMPRESSION,
 ) -> bytes:
