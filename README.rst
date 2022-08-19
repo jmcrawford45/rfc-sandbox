@@ -11,9 +11,9 @@
 Sandbox repo for me to learn through implementing RFCs of interest
 
 Future work:
-maintain protection, ownership, and (optional) mtime attributes for unzipped file
+cli wrapper that operates on files
 use streams instead of str for decompress out and compress in
 don't re-init ByteIO in BitStream.write
 dynamic huffman
 use more than 1 block
-encoding lookback > 1
+efficient compress.get_length_distance

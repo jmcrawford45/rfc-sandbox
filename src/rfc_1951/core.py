@@ -10,7 +10,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass
 from enum import Enum
 from io import BufferedIOBase, BytesIO
-from math import ceil
+from math import ceil, floor, log2
 from datetime import datetime
 from typing import Union
 from struct import pack
@@ -69,6 +69,9 @@ class BitStream:
             self._buffer_byte()
         return self._get_buffered_bits(n)
 
+    def write_code(self, n: int, content: int):
+        self.write(n, content, prefer_bytes = False)
+
     def write(self, n: int, content: bytes | int, prefer_bytes: bool = True):
         if isinstance(content, bytes) and n % 8:
             raise ValueError("Cannot write partial byte")
@@ -92,7 +95,7 @@ class BitStream:
                     self.flush_byte()
 
     def flush_byte(self):
-        if self.buffer:
+        if self.num_bits:
             self.underlying = BytesIO(self.underlying.getvalue() + pack("B", self.buffer & 0xff))
         self.num_bits = max(0, self.num_bits - 8)
         self.buffer = self.buffer >> 8
@@ -173,7 +176,9 @@ class FileHeader:
 
 
 class Length:
-    def __init__(self, code: int):
+    MIN_LENGTH = 3
+    MAX_LENGTH = 258
+    def __init__(self, code: int, additional_content: int | None = None):
         if not (257 <= code <= 285):
             raise ValueError("Length must have code where 257 <= code <= 285")
         self.code = code
@@ -198,10 +203,88 @@ class Length:
         else:
             self.extra_bits = 0
             self.min_length = 258
+        self.additional_content = additional_content
+
+    @classmethod
+    def from_length(cls, length: int):
+        if length not in range(cls.MIN_LENGTH, cls.MAX_LENGTH + 1):
+            raise ValueError(f"Invalid length {length}. must be in range(3, 259)")
+        if length in range(3, 11):
+            extra_bits = 0
+            min_code = 257
+            min_length = 3
+        elif length in range(11, 19):
+            extra_bits = 1
+            min_code = 265
+            min_length = 11
+        elif length in range(19, 35):
+            extra_bits = 2
+            min_code = 269
+            min_length = 19
+        elif length in range(35, 67):
+            extra_bits = 3
+            min_code = 273
+            min_length = 35
+        elif length in range(67, 131):
+            extra_bits = 4
+            min_code = 277
+            min_length = 67
+        elif length in range(131, 258):
+            extra_bits = 5
+            min_code = 281
+            min_length = 131
+        else:
+            extra_bits = 0
+            min_code = 285
+            min_length = 258
+        min_code += (length - min_length) // (2 ** extra_bits)
+        return cls(min_code, (length - min_length) % (2 ** extra_bits))
+
 
 
 class Distance:
-    def __init__(self, code: int):
+    #      Extra           Extra               Extra
+    # Code Bits Dist  Code Bits   Dist     Code Bits Distance
+    # ---- ---- ----  ---- ----  ------    ---- ---- --------
+    #   0   0    1     10   4     33-48    20    9   1025-1536
+    #   1   0    2     11   4     49-64    21    9   1537-2048
+    #   2   0    3     12   5     65-96    22   10   2049-3072
+    #   3   0    4     13   5     97-128   23   10   3073-4096
+    #   4   1   5,6    14   6    129-192   24   11   4097-6144
+    #   5   1   7,8    15   6    193-256   25   11   6145-8192
+    #   6   2   9-12   16   7    257-384   26   12  8193-12288
+    #   7   2  13-16   17   7    385-512   27   12 12289-16384
+    #   8   3  17-24   18   8    513-768   28   13 16385-24576
+    #   9   3  25-32   19   8   769-1024   29   13 24577-32768
+    TABLE = {
+        range(5,7): (4, 1),
+        range(7, 9): (5, 1),
+        range(9, 13): (6, 2),
+        range(13, 17): (7, 2),
+        range(17, 25): (8, 3),
+        range(25, 33): (9, 3),
+        range(33, 49): (10, 4),
+        range(49, 65): (11, 4),
+        range(65, 97): (12, 5),
+        range(97, 129): (13, 5),
+        range(129, 193): (14, 6),
+        range(193, 257): (15, 6),
+        range(257, 385): (16, 7),
+        range(385, 513): (17, 7),
+        range(513, 769): (18, 8),
+        range(769, 1025): (19, 8),
+        range(1025, 1537): (20, 9),
+        range(1537, 2049): (21, 9),
+        range(2049, 3073): (22, 10),
+        range(3073, 4097): (23, 10),
+        range(4097, 6145): (24, 11),
+        range(6145, 8193): (25, 11),
+        range(8193, 12289): (26, 12),
+        range(12289, 16385): (27, 12),
+        range(16385, 24577): (28, 13),
+        range(24577, 32769): (29, 13),
+    }
+    def __init__(self, code: int,  additional_content: int | None = None):
         if not (0 <= code <= 29):
             raise ValueError("Distance must have code where 0 <= code <= 29")
         self.code = code
@@ -214,6 +297,21 @@ class Distance:
                 + 2 ** (self.extra_bits + 1)
                 + (2 ** (self.extra_bits) if code % 2 else 0)
             )
+        self.additional_content = additional_content
+
+    @classmethod
+    def from_distance(cls, distance: int):
+        if distance in range(1, 5):
+            return cls(distance - 1)
+        else:
+            for interval in cls.TABLE:
+                if distance in interval:
+                    code, _ = cls.TABLE[interval]
+                    return cls(code, distance - interval.start)
+        raise ValueError(f"Distance {distance} was not in range [3, 32678]")
+
+
+
 
 class CodeCode:
     EXTRA_BITS = {
