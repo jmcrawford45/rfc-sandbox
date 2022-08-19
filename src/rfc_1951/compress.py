@@ -25,18 +25,23 @@ def get_length_distance(
     if index + Length.MIN_LENGTH > len(content_in):
         # not worth run encoding
         return 0, 0
-    if content_in[index:index+Length.MIN_LENGTH] not in hash_chain_map:
+    if content_in[index : index + Length.MIN_LENGTH] not in hash_chain_map:
         # no matches
         return 0, 0
     length_match = Length.MIN_LENGTH
-    hash_matches = hash_chain_map[content_in[index:index+Length.MIN_LENGTH]]
+    hash_matches = hash_chain_map[
+        content_in[index : index + Length.MIN_LENGTH]
+    ]
     for match in reversed(hash_matches):  # prefer recent matches
         if index - match > MAX_LOOKBACK:
             # outside of window
             return 0, 0
         distance = index - match
         length = Length.MIN_LENGTH
-        while index+length < len(content_in) and content_in[index+length] == content_in[match+length]:
+        while (
+            index + length < len(content_in)
+            and content_in[index + length] == content_in[match + length]
+        ):
             if length > length_match:
                 length_match = length
                 if length_match == Length.MAX_LENGTH:
@@ -49,9 +54,13 @@ def encode_fixed_compression(content_in: bytes, output: BitStream):
     index = 0
     hash_chain_map = defaultdict(list)
     while index < len(content_in):
-        if index-1 >= 0 and index+Length.MIN_LENGTH-1 < len(content_in):
-            hash_chain_map[content_in[index-1:index+Length.MIN_LENGTH-1]].append(index-1)
-        length, distance = get_length_distance(content_in, index, hash_chain_map)
+        if index - 1 >= 0 and index + Length.MIN_LENGTH - 1 < len(content_in):
+            hash_chain_map[
+                content_in[index - 1 : index + Length.MIN_LENGTH - 1]
+            ].append(index - 1)
+        length, distance = get_length_distance(
+            content_in, index, hash_chain_map
+        )
         if not length and not distance:
             output.write_code(
                 len(STATIC_LEN_CODES.encoding[content_in[index]]),
