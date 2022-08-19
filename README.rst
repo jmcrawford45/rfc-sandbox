@@ -16,4 +16,4 @@ use streams instead of str for decompress out and compress in
 don't re-init ByteIO in BitStream.write
 dynamic huffman
 use more than 1 block
-efficient compress.get_length_distance
+efficient compress.get_length_distance using hash chain map

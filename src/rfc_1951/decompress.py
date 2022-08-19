@@ -19,7 +19,9 @@ def is_ones_complement(x: int, y: int) -> bool:
     return base != 0 and ((base + 1) & base) == 0
 
 
-def get_code_codes(n: int, code_huffman: HuffmanEncoding, stream: BitStream) -> list[int]:
+def get_code_codes(
+    n: int, code_huffman: HuffmanEncoding, stream: BitStream
+) -> list[int]:
     """Extract n codes encoded by the huffman."""
     code_codes = []
     while len(code_codes) < n:
@@ -29,7 +31,9 @@ def get_code_codes(n: int, code_huffman: HuffmanEncoding, stream: BitStream) -> 
         else:
             to_repeat = code_codes[-1] if code_code == 16 else 0
             code_code = CodeCode(code_code)
-            to_add = (code_code.min_length + stream.read(code_code.extra_bits, prefer_bytes = False))
+            to_add = code_code.min_length + stream.read(
+                code_code.extra_bits, prefer_bytes=False
+            )
             code_codes += [to_repeat] * to_add
     return code_codes
 
@@ -41,7 +45,7 @@ def decode(stream: BitStream) -> bytes:
         if block_header.block_type == BlockType.NO_COMPRESSION:
             stream.clear_buffer()
             block_len, ones_complement = unpack("<HH", stream.read(32))
-            if not is_ones_complement(block_len, ones_complement & 0xffff):
+            if not is_ones_complement(block_len, ones_complement & 0xFFFF):
                 raise ValueError(
                     f"Invalid LEN, NLEN pair: {ones_complement} is not the ones-complement of {block_len}"
                 )
@@ -63,13 +67,21 @@ def decode(stream: BitStream) -> bytes:
                 while code_codes_added < n_code:
                     lengths[CODE_CODE_ORDER[code_codes_added]] = stream.read(3)
                     code_codes_added += 1
-                code_huffman = HuffmanEncoding.from_alphabet_code_lengths(lengths)
+                code_huffman = HuffmanEncoding.from_alphabet_code_lengths(
+                    lengths
+                )
 
-                code_codes = get_code_codes(n_len + n_dist, code_huffman, stream)
+                code_codes = get_code_codes(
+                    n_len + n_dist, code_huffman, stream
+                )
                 code_code_lengths = code_codes[:n_len]
                 code_code_dists = code_codes[n_len:]
-                len_codes = HuffmanEncoding.from_alphabet_code_lengths(code_code_lengths)
-                dist_codes = HuffmanEncoding.from_alphabet_code_lengths(code_code_dists)
+                len_codes = HuffmanEncoding.from_alphabet_code_lengths(
+                    code_code_lengths
+                )
+                dist_codes = HuffmanEncoding.from_alphabet_code_lengths(
+                    code_code_dists
+                )
             else:
                 len_codes = STATIC_LEN_CODES
                 dist_codes = STATIC_DIST_CODES
@@ -84,13 +96,17 @@ def decode(stream: BitStream) -> bytes:
                     # move backwards in output stream
                     # copy length bytes from this position to output stream
                     length = Length(value)
-                    length = length.min_length + stream.read(length.extra_bits, prefer_bytes = False)
+                    length = length.min_length + stream.read(
+                        length.extra_bits, prefer_bytes=False
+                    )
                     dist = stream.read_huffman_bits(dist_codes)
                     dist = Distance(dist)
-                    dist = dist.min_distance + stream.read(dist.extra_bits, prefer_bytes = False)
+                    dist = dist.min_distance + stream.read(
+                        dist.extra_bits, prefer_bytes=False
+                    )
                     index = len(output) - dist
                     while length:
-                        output += output[index:index+1]
+                        output += output[index : index + 1]
                         length -= 1
                         index += 1
 

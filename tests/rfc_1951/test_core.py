@@ -5,7 +5,7 @@ import pytest
 
 def test_deflate_huffman_encoding_from_code_lengths():
     huffman = HuffmanEncoding.from_alphabet_code_lengths([2, 1, 3, 3])
-    assert huffman.encoding == ['10', '0', '110', '111']
+    assert huffman.encoding == ["10", "0", "110", "111"]
 
 
 @pytest.mark.parametrize(
@@ -24,6 +24,7 @@ def test_length(code, extra_bits, min_length):
     assert length.code == code
     assert length.extra_bits == extra_bits
     assert length.min_length == min_length
+
 
 @pytest.mark.parametrize(
     "length,code,additional_content",
@@ -58,6 +59,7 @@ def test_distance(code, extra_bits, min_distance):
     assert distance.code == code
     assert distance.extra_bits == extra_bits
     assert distance.min_distance == min_distance
+
 
 @pytest.mark.parametrize(
     "distance,code,additional_content",

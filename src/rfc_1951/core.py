@@ -4,7 +4,27 @@ MAX_DUPLICATED_LENGTH = 258
 CODE_END_OF_BLOCK = 256
 GZIP_FILE_ID = bytes.fromhex("1f8b")
 COMPRESSION_METHOD = b"\x08"
-CODE_CODE_ORDER = [16,17,18,0,8,7,9,6,10,5,11,4,12,3,13,2,14,1,15]
+CODE_CODE_ORDER = [
+    16,
+    17,
+    18,
+    0,
+    8,
+    7,
+    9,
+    6,
+    10,
+    5,
+    11,
+    4,
+    12,
+    3,
+    13,
+    2,
+    14,
+    1,
+    15,
+]
 
 from collections import Counter, defaultdict
 from dataclasses import dataclass
@@ -20,6 +40,7 @@ class BitStream:
     """
     A thin wrapper around a byte stream that allows reading bits instead of bytes.
     """
+
     def __init__(self, underlying: Union[bytes, BufferedIOBase]):
         if isinstance(underlying, bytes):
             underlying = BytesIO(underlying)
@@ -36,16 +57,17 @@ class BitStream:
         return out
 
     def _buffer_byte(self):
-        self.buffer += int.from_bytes(self.underlying.read(1), 'big') << self.num_bits
+        self.buffer += (
+            int.from_bytes(self.underlying.read(1), "big") << self.num_bits
+        )
         self.num_bits += 8
-
 
     def clear_buffer(self):
         """Useful for ignoring partial bytes"""
         self.num_bits = 0
         self.buffer = 0b00000000
 
-    def read_huffman_bits(self, huffman: 'HuffmanEncoding') -> int:
+    def read_huffman_bits(self, huffman: "HuffmanEncoding") -> int:
         """Return a value decoded from a Huffman tree, or throw a KeyError if not possible"""
         node = huffman.node
         while node and node.value is None:
@@ -70,18 +92,20 @@ class BitStream:
         return self._get_buffered_bits(n)
 
     def write_code(self, n: int, content: int):
-        self.write(n, content, prefer_bytes = False)
+        self.write(n, content, prefer_bytes=False)
 
     def write(self, n: int, content: bytes | int, prefer_bytes: bool = True):
         if isinstance(content, bytes) and n % 8:
             raise ValueError("Cannot write partial byte")
         if prefer_bytes and not self.num_bits and n % 8 == 0:
             for i in range(len(content)):
-                self.underlying = BytesIO(self.underlying.getvalue() + content[i:i+1])
+                self.underlying = BytesIO(
+                    self.underlying.getvalue() + content[i : i + 1]
+                )
         else:
             while n:
                 if isinstance(content, bytes):
-                    to_add = int.from_bytes(content[0:1], 'big')
+                    to_add = int.from_bytes(content[0:1], "big")
                     content = content[1:]
                     num_bits_added = 8
                 else:
@@ -96,17 +120,15 @@ class BitStream:
 
     def flush_byte(self):
         if self.num_bits:
-            self.underlying = BytesIO(self.underlying.getvalue() + pack("B", self.buffer & 0xff))
+            self.underlying = BytesIO(
+                self.underlying.getvalue() + pack("B", self.buffer & 0xFF)
+            )
         self.num_bits = max(0, self.num_bits - 8)
         self.buffer = self.buffer >> 8
 
     def flush(self):
         while self.buffer:
             self.flush_byte()
-
-
-
-
 
 
 class BlockType(Enum):
@@ -155,15 +177,22 @@ class FileHeader:
         if self.extra_data:
             flags |= 0b100
         if self.filename:
-            flags |=  0b1000
+            flags |= 0b1000
         if self.comment:
             flags |= 0b10000
         # if self.crc:
         #     flags |= 0b10
         flags = pack("B", flags)
-        xfl = b"\x00"    
+        xfl = b"\x00"
 
-        header = GZIP_FILE_ID + COMPRESSION_METHOD + flags + pack("<i", int(self.mtime.timestamp())) + xfl + pack("B", self.os.value)
+        header = (
+            GZIP_FILE_ID
+            + COMPRESSION_METHOD
+            + flags
+            + pack("<i", int(self.mtime.timestamp()))
+            + xfl
+            + pack("B", self.os.value)
+        )
         if self.extra_data:
             header += pack("<H", len(extra_data)) + extra_data
         if self.filename:
@@ -178,6 +207,7 @@ class FileHeader:
 class Length:
     MIN_LENGTH = 3
     MAX_LENGTH = 258
+
     def __init__(self, code: int, additional_content: int | None = None):
         if not (257 <= code <= 285):
             raise ValueError("Length must have code where 257 <= code <= 285")
@@ -208,7 +238,9 @@ class Length:
     @classmethod
     def from_length(cls, length: int):
         if length not in range(cls.MIN_LENGTH, cls.MAX_LENGTH + 1):
-            raise ValueError(f"Invalid length {length}. must be in range(3, 259)")
+            raise ValueError(
+                f"Invalid length {length}. must be in range(3, 259)"
+            )
         if length in range(3, 11):
             extra_bits = 0
             min_code = 257
@@ -241,7 +273,6 @@ class Length:
         return cls(min_code, (length - min_length) % (2 ** extra_bits))
 
 
-
 class Distance:
     #      Extra           Extra               Extra
     # Code Bits Dist  Code Bits   Dist     Code Bits Distance
@@ -257,7 +288,7 @@ class Distance:
     #   8   3  17-24   18   8    513-768   28   13 16385-24576
     #   9   3  25-32   19   8   769-1024   29   13 24577-32768
     TABLE = {
-        range(5,7): (4, 1),
+        range(5, 7): (4, 1),
         range(7, 9): (5, 1),
         range(9, 13): (6, 2),
         range(13, 17): (7, 2),
@@ -284,7 +315,8 @@ class Distance:
         range(16385, 24577): (28, 13),
         range(24577, 32769): (29, 13),
     }
-    def __init__(self, code: int,  additional_content: int | None = None):
+
+    def __init__(self, code: int, additional_content: int | None = None):
         if not (0 <= code <= 29):
             raise ValueError("Distance must have code where 0 <= code <= 29")
         self.code = code
@@ -311,25 +343,17 @@ class Distance:
         raise ValueError(f"Distance {distance} was not in range [3, 32678]")
 
 
-
-
 class CodeCode:
-    EXTRA_BITS = {
-        16: 2,
-        17: 3,
-        18: 7
-    }
-    MIN_LENGTH = {
-        16: 3,
-        17: 3,
-        18: 11
-    }
+    EXTRA_BITS = {16: 2, 17: 3, 18: 7}
+    MIN_LENGTH = {16: 3, 17: 3, 18: 11}
+
     def __init__(self, code: int):
         if not (16 <= code <= 18):
             raise ValueError("CodeCode must have code where 0 <= code <= 29")
         self.code = code
         self.extra_bits = self.EXTRA_BITS[code]
         self.min_length = self.MIN_LENGTH[code]
+
 
 class Node:
     def __init__(self):
@@ -358,7 +382,7 @@ class HuffmanEncoding:
 
     def __init__(self, encoding: list[int], alphabet_code_lengths: list[int]):
         self.encoding = encoding
-        self.decode_map = dict([(v, k) for k,v in enumerate(self.encoding)])
+        self.decode_map = dict([(v, k) for k, v in enumerate(self.encoding)])
         self.alphabet_code_lengths = alphabet_code_lengths
 
     @classmethod
@@ -403,7 +427,9 @@ class HuffmanEncoding:
             if code_length == 0:
                 continue
             alphabet_encode_map[letter_num] = next_code[code_length]
-            binary = format(alphabet_encode_map[letter_num], f"0{code_length}b")
+            binary = format(
+                alphabet_encode_map[letter_num], f"0{code_length}b"
+            )
             node = root
             for char in binary:
                 node = node.children[int(char)]
@@ -414,7 +440,8 @@ class HuffmanEncoding:
         base.node = root
         return base
 
-STATIC_LEN_CODES = HuffmanEncoding.from_alphabet_code_lengths([8] * 144 + [9] * 112 + [7] * 24 + [8] * 8)
+
+STATIC_LEN_CODES = HuffmanEncoding.from_alphabet_code_lengths(
+    [8] * 144 + [9] * 112 + [7] * 24 + [8] * 8
+)
 STATIC_DIST_CODES = HuffmanEncoding.from_alphabet_code_lengths([5] * 32)
-
-
