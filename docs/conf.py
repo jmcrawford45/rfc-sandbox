@@ -19,14 +19,14 @@
 
 # -- Project information -----------------------------------------------------
 
-project = u"rfc_sandbox"
-copyright = u"2021, Jared Crawford <jmcrawford45@gmail.com>"
-author = u"Jared Crawford <jmcrawford45@gmail.com>"
+project = "rfc_sandbox"
+copyright = "2021, Jared Crawford <jmcrawford45@gmail.com>"
+author = "Jared Crawford <jmcrawford45@gmail.com>"
 
 # The short X.Y version
-version = u""
+version = ""
 # The full version, including alpha/beta/rc tags
-release = u""
+release = ""
 
 
 # -- General configuration ---------------------------------------------------
@@ -67,7 +67,7 @@ language = None
 # List of patterns, relative to source directory, that match files and
 # directories to ignore when looking for source files.
 # This pattern also affects html_static_path and html_extra_path.
-exclude_patterns = [u"_build", "Thumbs.db", ".DS_Store"]
+exclude_patterns = ["_build", "Thumbs.db", ".DS_Store"]
 
 # The name of the Pygments (syntax highlighting) style to use.
 pygments_style = None
@@ -132,8 +132,8 @@ latex_documents = [
     (
         master_doc,
         "rfc_sandbox.tex",
-        u"rfc_sandbox Documentation",
-        u"Jared Crawford \\textless{}jmcrawford45@gmail.com\\textgreater{}",
+        "rfc_sandbox Documentation",
+        "Jared Crawford \\textless{}jmcrawford45@gmail.com\\textgreater{}",
         "manual",
     ),
 ]
@@ -144,7 +144,7 @@ latex_documents = [
 # One entry per manual page. List of tuples
 # (source start file, name, description, authors, manual section).
 man_pages = [
-    (master_doc, "rfc_sandbox", u"rfc_sandbox Documentation", [author], 1)
+    (master_doc, "rfc_sandbox", "rfc_sandbox Documentation", [author], 1)
 ]
 
 
@@ -157,7 +157,7 @@ texinfo_documents = [
     (
         master_doc,
         "rfc_sandbox",
-        u"rfc_sandbox Documentation",
+        "rfc_sandbox Documentation",
         author,
         "rfc_sandbox",
         "One line description of project.",
