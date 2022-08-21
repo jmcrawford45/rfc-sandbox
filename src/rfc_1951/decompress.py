@@ -182,6 +182,6 @@ def gunzip(stream: BitStream) -> bytes:
     if crc and crc != crc32(output):
         raise IOError("CRC of uncompressed did not match for gzip file")
     original_size = unpack("<I", stream.read(32))[0]
-    if original_size != len(output) % (2**32):
+    if original_size != len(output) % (2 ** 32):
         raise IOError("uncompressed data size did not match for gzip file")
     return output

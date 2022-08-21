@@ -4,7 +4,7 @@ from struct import pack
 
 from rfc_1951.core import *
 
-MAX_LOOKBACK = 2**10
+MAX_LOOKBACK = 2 ** 10
 MAX_LOOKAHEAD = 200
 
 
@@ -12,7 +12,7 @@ def encode_no_compression(content_in: bytes, output: BitStream):
     output.flush_byte()
     block_len = len(content_in) & 0xFF
     output.write(16, pack("<H", block_len))
-    output.write(16, pack("<H", ~block_len % (2**16)))
+    output.write(16, pack("<H", ~block_len % (2 ** 16)))
     output.write(8 * len(content_in), content_in)
 
 
