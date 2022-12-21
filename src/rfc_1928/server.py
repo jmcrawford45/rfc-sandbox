@@ -3,14 +3,15 @@ from socket import AF_INET, SOCK_STREAM, inet_aton, inet_ntoa, socket
 from rfc_1928 import *
 from select import select
 
+
 class ThreadingTCPServer(ThreadingMixIn, TCPServer):
     pass
 
 
 class SocksProxy(StreamRequestHandler):
-    AUTH = {b"jcrawford":b"password"}
+    AUTH = {b"jcrawford": b"password"}
 
-    def proxy(self,client,remote):
+    def proxy(self, client, remote):
         while True:
             read, _, _ = select([client, remote], [], [])
             if client in read:
@@ -30,7 +31,7 @@ class SocksProxy(StreamRequestHandler):
         if Method.NO_AUTH in method_request.methods:
             return Method.NO_AUTH
         elif Method.BASIC in method_request.methods:
-            return Method.BASIC 
+            return Method.BASIC
         else:
             # TODO
             return Method.NO_ACCEPTABLE
@@ -55,16 +56,25 @@ class SocksProxy(StreamRequestHandler):
             return
 
     @staticmethod
-    def handle_connect(address: str, request: Request) -> tuple[socket | None, Reply]:
+    def handle_connect(
+        address: str, request: Request
+    ) -> tuple[socket | None, Reply]:
         try:
             remote = socket(AF_INET, SOCK_STREAM)
             remote.connect((address, request.port))
             dest_addr, port = remote.getsockname()
             dest_addr = inet_aton(dest_addr)
-            reply = Reply.create(ReplyStatus.SUCCEEDED, request.address_type, dest_addr, port)
+            reply = Reply.create(
+                ReplyStatus.SUCCEEDED, request.address_type, dest_addr, port
+            )
             return remote, reply
         except Exception:
-            reply = Reply.create(ReplyStatus.CONNECTION_REFUSED, AddressType.IP_V4, 0x00000000, 0x0000)
+            reply = Reply.create(
+                ReplyStatus.CONNECTION_REFUSED,
+                AddressType.IP_V4,
+                0x00000000,
+                0x0000,
+            )
             return None, reply
 
     def handle(self):
@@ -73,7 +83,9 @@ class SocksProxy(StreamRequestHandler):
         if selected_auth == Method.NO_ACCEPTABLE:
             self.server.close_request(self.request)
             return
-        if selected_auth == Method.BASIC and not SocksProxy.handle_basic_auth(self.connection, self.AUTH):
+        if selected_auth == Method.BASIC and not SocksProxy.handle_basic_auth(
+            self.connection, self.AUTH
+        ):
             self.server.close_request(self.request)
             return
         request = Request.unpack(self.connection)
@@ -92,6 +104,6 @@ class SocksProxy(StreamRequestHandler):
         self.server.close_request(self.request)
 
 
-if __name__ == '__main__':
-    with ThreadingTCPServer(('127.0.0.1', 9998), SocksProxy) as server:
+if __name__ == "__main__":
+    with ThreadingTCPServer(("127.0.0.1", 9998), SocksProxy) as server:
         server.serve_forever()

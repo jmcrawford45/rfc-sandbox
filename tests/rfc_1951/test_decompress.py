@@ -19,19 +19,19 @@ VALID_FILE_NEWLINE = "1f8b08008901fc620003e302009306d73201000000"
     "input_stream,expected",
     [
         (
-            BitStream(BytesIO(0b00000001 .to_bytes(1, "big"))),
+            BitStream(BytesIO(0b00000001.to_bytes(1, "big"))),
             BlockHeader(True, BlockType.NO_COMPRESSION),
         ),
         (
-            BitStream(BytesIO(0b00000100 .to_bytes(1, "big"))),
+            BitStream(BytesIO(0b00000100.to_bytes(1, "big"))),
             BlockHeader(False, BlockType.DYNAMIC_HUFFMAN_COMPRESSION),
         ),
         (
-            BitStream(BytesIO(0b00000011 .to_bytes(1, "big"))),
+            BitStream(BytesIO(0b00000011.to_bytes(1, "big"))),
             BlockHeader(True, BlockType.FIXED_HUFFMAN_COMPRESSION),
         ),
         (
-            BitStream(BytesIO(0b00000110 .to_bytes(1, "big"))),
+            BitStream(BytesIO(0b00000110.to_bytes(1, "big"))),
             BlockHeader(False, BlockType.RESERVED_ERROR),
         ),
     ],
@@ -69,7 +69,7 @@ def test_get_file_header_invalid_cm():
 def test_get_file_header_invalid_flags():
     invalid_header = (
         bytes.fromhex(VALID_FILE_HEADER[:6])
-        + 0b10000000 .to_bytes(1, "big")
+        + 0b10000000.to_bytes(1, "big")
         + bytes.fromhex(VALID_FILE_HEADER[8:])
     )
     with pytest.raises(IOError, match="unknown gzip flag"):
